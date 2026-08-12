@@ -107,11 +107,48 @@ dat %>%
 
 All analyses were conducted in R [@R-base]. To examine the effect of treatment on catch rate while accounting for non-independence among traps sampled on the same day and within the same year-site, a generalized linear mixed model was fitted for each species using the glmmTMB package [@R-glmmTMB]. As the data consisted of species counts, two appropriate model likelihoods were explored for each species during fitting, Poisson and negative binomial. The Poisson model assumes the mean and variance of the count data are equal (i.e. equally dispersed), while the negative binomial model allowed for overdispersion, where the variance exceeded the mean. The variance of ecological data frequently exceeds the mean (overdispersed), in which case the assumption of the Poisson model would be violated. Within the models, the combination of sampling site and year (year-site) was treated as an independent sample. Egg-odor treatment was included as a fixed effect. Year-site combinations and sampling day (nested within year-site) were included as random intercepts. Estimated marginal means for each treatment were obtained using the emmeans package [@R-emmeans], back-transformed to the response (catch) scale. Pairwise differences between treatments were then tested using Tukey-adjusted contrasts to control the family-wise error rate across all comparisons.
 
+## Model definition
+Employing a Poisson likelihood, the model was defined as follows:
+
+$$
+y_{ijk} \mid u_i, v_{ij} \;\sim\; \text{Pois}(\mu_{ijk}),
+$$
+
+$$
+\log(\mu_{ijk}) = \beta_0 + \beta_A x_{A,ijk} + \beta_E x_{E,ijk} + \beta_J x_{J,ijk} + u_i + v_{ij},
+$$
+
+$$
+u_i \sim \mathcal{N}(0,\, \sigma^2_{\text{year-site}}), \qquad
+v_{ij} \sim \mathcal{N}(0,\, \sigma^2_{\text{day}}),
+$$
+
+where $y_{ijk}$ is the catch in trap $k$ on day $j$ within year-site $i$; $\beta_0$ is the
+log expected catch in the control treatment (C); $\beta_A$, $\beta_E$ and $\beta_J$ are the
+effects of the amino-acid (A), whole-egg (E) and egg-juice (J) treatments relative to the
+control, coded through the treatment indicator variables $x_A$, $x_E$ and $x_J$; and
+$u_i$ and $v_{ij}$ are random intercepts for year-site and for sampling day nested within
+year-site, with the double subscript $ij$ denoting that each day belongs to a single
+year-site. The Poisson likelihood imposes $\operatorname{Var}(y_{ijk}) = \mu_{ijk}$.
+
+The negative binomial model shared the same linear predictor and random-effect structure,
+but relaxed this assumption by introducing a dispersion parameter $\theta$:
+
+$$
+y_{ijk} \mid u_i, v_{ij} \;\sim\; \text{NB}(\mu_{ijk},\, \theta),
+$$
+
+under which $\operatorname{Var}(y_{ijk}) = \mu_{ijk} + \mu_{ijk}^2 / \theta$, so that the
+variance exceeds the mean and approaches the Poisson case as $\theta \to \infty$.
+
 # Results
 
 ## Model selection
 
 To determine which model resulted in a better fit to the data, each of the two likelihood families were compared using three criteria: DHARMa residual diagnostics [@R-DHARMa], Akaike information criterion (AIC) and a zero-inflation test. For Sculpin, residuals from the Poisson model deviated significantly from the expected distribution (Kolmogorov–Smirnov test, p = 0.028), indicating the Poisson model described the data poorly. AIC also indicated that the negative binomial model provided a better fit to the data than the Poisson (AIC = 1442.2 and 3086.1, respectively; ΔAIC ≈ 1644). Finally, the negative binomial model showed no evidence of zero-inflation (ratio of observed to expected zeros ≈ 0.94, p = 0.85). Given these results, the negative binomial likelihood model was chosen for Sculpin. The negative binomial was also selected for three-spine based on the same criteria: the Poisson model deviated significantly from the expected distribution (Kolmogorov–Smirnov test, p < 0.001), AIC indicated the negative binomial was superior to the Poisson (AIC = 1125.9 and 1714.9, respectively; ΔAIC ≈ 589), and the negative binomial showed no evidence of zero-inflation (ratio of observed to expected zeros ≈ 0.95, p = 0.77).
+```{=openxml}
+<w:p><w:r><w:br w:type="page"/></w:r></w:p>
+```
 
 ## Random effects
 
