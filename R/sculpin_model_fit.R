@@ -13,6 +13,7 @@ library(emmeans)
 
 
 
+`%||%` <- function(x, y) if (is.null(x)) y else x
 
 #1. Start by reading in the sculpin and 3 spine data, and checking replicatuon
 dat <- read.csv(here("data","sculpin_stickleback_long.csv"))
@@ -67,20 +68,20 @@ sc_n_binom <- glmmTMB( #Poisson model
 #3.2 model seleciton
 
 #Compare the resiudals ob both models
-sim_pois <- simulateResiduals(sc_pois)
-sim_nb   <- simulateResiduals(sc_n_binom)
+sim_pois_sc <- simulateResiduals(sc_pois)
+sim_nb_sc   <- simulateResiduals(sc_n_binom)
 
 png(here("output","figures", "sculpin_diagnostics_pois_vs_nb.png"),
     width = 2400, height = 2400, res = 300)   # res=300 -> print quality
 par(mfrow = c(2, 2))
-plotQQunif(sim_pois);    plotResiduals(sim_pois)
-plotQQunif(sim_nb);      plotResiduals(sim_nb)
+plotQQunif(sim_pois_sc);    plotResiduals(sim_pois_sc)
+plotQQunif(sim_nb_sc);      plotResiduals(sim_nb_sc)
 par(mfrow = c(1, 1))
 dev.off()
 
 png(here("output","figures", "sculpin_nb_dharma.png"),
     width = 2400, height = 1200, res = 300)
-plot(sim_nb)
+plot(sim_nb_sc)
 dev.off()
 
 #Resiudal rsults point towards nbinom, as poisson fails dharma diags.
@@ -93,7 +94,7 @@ AIC(sc_pois, sc_n_binom) #compare AIC
 #Check zero inflation
 png(here("output","figures", "sculpin_nb_zeroinflation.png"),
     width = 1600, height = 1200, res = 300)
-testZeroInflation(sim_nb)
+x <- testZeroInflation(sim_nb_sc)
 dev.off()
 # p> 0.05, ratio = 0.93
 

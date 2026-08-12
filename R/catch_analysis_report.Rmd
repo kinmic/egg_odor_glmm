@@ -1,0 +1,154 @@
+---
+title: "Effects of Odor Treatment on Sculpin and Three-spine Catch Rates"
+author: "M. Kinneen"
+date: "`r format(Sys.Date(), '%d %B %Y')`"
+output:
+  word_document:
+    toc: FALSE
+    number_sections: true
+    fig_caption: true
+bibliography: packages.bib              # written by the write-bib chunk below, on every knit
+# csl: canadian-journal-of-fisheries-and-aquatic-sciences.csl   # uncomment + supply .csl to match a journal
+link-citations: true
+# Knit button writes the .docx into outputs/reports (folder created if missing):
+knit: >
+  (function(input, ...) {
+    out <- here::here("outputs", "reports")
+    dir.create(out, recursive = TRUE, showWarnings = FALSE)
+    rmarkdown::render(input, output_dir = out, ...)
+  })
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo    = FALSE,
+  message = FALSE,
+  warning = FALSE,
+  fig.width  = 7,
+  fig.height = 5,
+  dpi = 300
+)
+
+library(here)
+library(dplyr)
+library(tidyr)
+library(glmmTMB)
+library(DHARMa)
+library(emmeans)
+library(ggplot2)
+
+`%||%` <- function(x, y) if (is.null(x)) y else x   # guard for older R + glmmTMB
+```
+
+```{r write-bib, include=FALSE}
+# Regenerates packages.bib from the INSTALLED versions every knit, so the
+# reference list never drifts from the software you actually ran.
+knitr::write_bib(
+  c("base", "glmmTMB", "DHARMa", "emmeans"),
+  file = "packages.bib"
+)
+```
+
+```{r load-and-fit, include=FALSE}
+dat <- read.csv(here("data", "sculpin_stickleback_long.csv"))
+
+model_dat <- dat %>%
+  mutate(
+    year      = factor(year),
+    treatment = factor(treatment),
+    site      = factor(Location),
+    species   = factor(species),
+    trap      = factor(trap.no),
+    year_site = factor(paste(year, site, sep = ":")),
+    day       = factor(paste(year_site, DOY, sep = ":")),
+    value     = as.integer(value)
+  ) %>%
+  mutate(treatment = relevel(treatment, ref = "C"))   # control = reference
+
+sculp_dat   <- model_dat %>% filter(species == "sculpin")
+threesp_dat <- model_dat %>% filter(species == "3-spine")
+
+# --- Sculpin ---
+sc_pois    <- glmmTMB(value ~ treatment + (1 | year_site) + (1 | day),
+                      data = sculp_dat, family = poisson)
+sc_n_binom <- glmmTMB(value ~ treatment + (1 | year_site) + (1 | day),
+                      data = sculp_dat, family = nbinom2)
+
+# --- Three-spine ---
+threesp_pois    <- glmmTMB(value ~ treatment + (1 | year_site) + (1 | day),
+                           data = threesp_dat, family = poisson)
+threesp_n_binom <- glmmTMB(value ~ treatment + (1 | year_site) + (1 | day),
+                           data = threesp_dat, family = nbinom2)
+```
+
+# Methods
+
+## Data and sampling design
+
+The study was conducted across two sites, Fuel Dump Island and Woody Island, over three summers spanning a 10-year period (2015, 2020, and 2025). Both sites were sampled in 2015, whereas only Fuel Dump Island was sampled in 2020 and 2025 (Figure 1). Four odor treatments were used in this study: Egg juice (J), Whole eggs (E), a combination of water and egg amino acids (A), and a control treatment consisting of lake water (C). Treatments E, A and C were used during all sampling events, while J was only used in 2015. Approximately 18 traps were deployed at each sampling site, where each trap was treated with one of the treatments described above. The sampling period differed slightly over the years, though it generally occurred during the month of August. As there was an imbalance in sampling, with Woody Island only sampled in 2015, we treated combinations of year and site as independent replicates and combined them into a single grouping factor, as opposed to treating year and site as separate, crossed effects. Catch was recorded for multiple species, but the two species analysed here were Sculpin (*Cottus cognatus*) and Three-spine stickleback (*Gasterosteus aculeatus*).
+
+```{r sampling-effort-figure, fig.width=5, fig.height=2.5, fig.cap="Figure 1. Sampling effort (trap deployments) by year, site, and treatment. Grey cells indicate treatment-year-site combinations that were not sampled."}
+dat %>%
+  distinct(year, Location, treatment, DOY, trap.no) %>%
+  count(year, Location, treatment) %>%
+  tidyr::complete(year, Location, treatment) %>%
+  ggplot(aes(x = factor(year), y = Location, fill = n)) +
+  geom_tile(colour = "white") +
+  geom_text(aes(label = n), colour = "white", fontface = "bold", size = 3) +
+  facet_wrap(~ treatment) +
+  scale_fill_viridis_c(name = "Trap\ndeployments", na.value = "grey90") +
+  labs(x = "Year", y = "Site", title = "Sampling effort by year, site, and treatment") +
+  theme_minimal(base_size = 12) +
+  theme(panel.grid = element_blank())
+```
+
+## Statistical analysis
+
+All analyses were conducted in R [@R-base]. To examine the effect of treatment on catch rate while accounting for non-independence among traps sampled on the same day and within the same year-site, a generalized linear mixed model was fitted for each species using the glmmTMB package [@R-glmmTMB]. As the data consisted of species counts, two appropriate model likelihoods were explored for each species during fitting, Poisson and negative binomial. The Poisson model assumes the mean and variance of the count data are equal (i.e. equally dispersed), while the negative binomial model allowed for overdispersion, where the variance exceeded the mean. The variance of ecological data frequently exceeds the mean (overdispersed), in which case the assumption of the Poisson model would be violated. Within the models, the combination of sampling site and year (year-site) was treated as an independent sample. Egg-odor treatment was included as a fixed effect. Year-site combinations and sampling day (nested within year-site) were included as random intercepts. Estimated marginal means for each treatment were obtained using the emmeans package [@R-emmeans], back-transformed to the response (catch) scale. Pairwise differences between treatments were then tested using Tukey-adjusted contrasts to control the family-wise error rate across all comparisons.
+
+# Results
+
+## Model selection
+
+To determine which model resulted in a better fit to the data, each of the two likelihood families were compared using three criteria: DHARMa residual diagnostics [@R-DHARMa], Akaike information criterion (AIC) and a zero-inflation test. For Sculpin, residuals from the Poisson model deviated significantly from the expected distribution (Kolmogorov–Smirnov test, p = 0.028), indicating the Poisson model described the data poorly. AIC also indicated that the negative binomial model provided a better fit to the data than the Poisson (AIC = 1442.2 and 3086.1, respectively; ΔAIC ≈ 1644). Finally, the negative binomial model showed no evidence of zero-inflation (ratio of observed to expected zeros ≈ 0.94, p = 0.85). Given these results, the negative binomial likelihood model was chosen for Sculpin. The negative binomial was also selected for three-spine based on the same criteria: the Poisson model deviated significantly from the expected distribution (Kolmogorov–Smirnov test, p < 0.001), AIC indicated the negative binomial was superior to the Poisson (AIC = 1125.9 and 1714.9, respectively; ΔAIC ≈ 589), and the negative binomial showed no evidence of zero-inflation (ratio of observed to expected zeros ≈ 0.95, p = 0.77).
+
+## Random effects
+
+The negative binomial models for both species included random intercepts for year-site and for sampling day nested within year-site. The variance associated with both intercepts was non-negligible, indicating that traps sampled on the same day or within the same year-site were not independent, and supporting the use of random effects for these components. For both species, daily variation in catch rate was greater than year-site variation. For sculpin, day SD ≈ 0.92 versus year-site SD ≈ 0.64 (log scale); for three-spine, the difference was smaller (day SD ≈ 0.78, year-site SD ≈ 0.63; log scale).
+
+## Fixed effects
+
+The relationship between odor treatment and Sculpin catch rate was highly significant (χ² = 237.83, df = 3, p < 0.001, Figure 2). For treatment C, the control group predicted catch was estimated at 0.87 fish per trap. Treatment E had the largest effect on catch, with predicted catch for traps that used treatment E estimated at 15.71 fish, approximately 18-fold higher than the control (p < 0.001). Treatment J also had a positive effect on catch rate, increasing predicted catch to 2.0 fish per trap or approximately 2-fold that of the control (p = 0.0074). The effect of E was approximately 8-fold greater than that of J (ratio ≈ 7.7, p < 0.001). Treatment A did not differ significantly from the control (p = 0.552).
+
+```{r sculpin-emm-figure, fig.width=5, fig.height=3.5, fig.cap="Figure 2. Sculpin: model-estimated catch per trap by treatment (negative binomial GLMM), with 95% confidence intervals."}
+as.data.frame(emmeans(sc_n_binom, ~ treatment, type = "response")) %>%
+  ggplot(aes(x = treatment, y = response)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.15) +
+  labs(x = "Egg-odor treatment", y = "Estimated catch (fish per trap)") +
+  theme_minimal(base_size = 12)
+```
+
+```{=openxml}
+<w:p><w:r><w:br w:type="page"/></w:r></w:p>
+```
+
+
+The relationship between odor treatment and Three-spine catch rate was significant (χ² = 12.74, df = 3, p < 0.01, Figure 3). For treatment C, the control group predicted catch was estimated at 0.91 fish per trap. The only treatment that had a significant effect on catch rate was treatment E: predicted catch for traps using treatment E was 2.23 fish per trap, approximately 2.4-fold higher than the control (p = 0.002). Treatments A and J did not differ significantly from the control treatment, with predicted catch of 1.34 (p = 0.42) and 1.50 (p = 0.32) fish per trap, respectively.
+
+```{r threespine-emm-figure, fig.width=5, fig.height=3.5, fig.cap="Figure 3. Three-spine: model-estimated catch per trap by treatment (negative binomial GLMM), with 95% confidence intervals."}
+as.data.frame(emmeans(threesp_n_binom, ~ treatment, type = "response")) %>%
+  ggplot(aes(x = treatment, y = response)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = asymp.LCL, ymax = asymp.UCL), width = 0.15) +
+  labs(x = "Egg-odor treatment", y = "Estimated catch (fish per trap)") +
+  theme_minimal(base_size = 12)
+```
+
+# Discussion
+
+For both species, odor treatment had a significant effect on catch rate, though the treatment-level effect varied with species. For Sculpin, both whole eggs (E) and egg juice (J) led to substantial increases in catch rate. While whole eggs were significant for three-spine, the effect relative to the control group was much lower than was observed for Sculpin, and the egg juice effect was marginal. For both species, amino acids did not have an impact on catch rates. It should be noted that treatment J was not applied in 2015, meaning that the effect shown here is not definitive.
+
+Day-to-day variation in catch was greater than variation among year-sites in both species, indicating that conditions varying at the scale of individual sampling days contributed more to catch variability than persistent differences among sites and years.
+
+# References

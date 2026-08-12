@@ -14,7 +14,7 @@ library(emmeans)
 
 
 #1. Start by reading in the 3-spine and 3 spine data, and checking replicatuon
-dat <- read.csv(here("data","3-spine_stickleback_long.csv"))
+dat <- read.csv(here("data","sculpin_stickleback_long.csv"))
 
 # traps per day, and how many days per year-site?
 dat %>%
@@ -93,7 +93,8 @@ AIC(threesp_pois, threesp_n_binom) #compare AIC
 #Check zero inflation
 png(here("output","figures", "3-spine_nb_zeroinflation.png"),
     width = 1600, height = 1200, res = 300)
-testZeroInflation(sim_nb)
+x <- testZeroInflation(sim_nb)
+print(x$statistic)
 dev.off()
 # p> 0.05, ratio = 0.95
 
