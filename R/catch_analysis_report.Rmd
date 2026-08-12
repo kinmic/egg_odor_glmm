@@ -13,9 +13,10 @@ link-citations: true
 # Knit button writes the .docx into outputs/reports (folder created if missing):
 knit: >
   (function(input, ...) {
-    out <- here::here("outputs", "reports")
+    out <- here::here("output", "reports")
     dir.create(out, recursive = TRUE, showWarnings = FALSE)
-    rmarkdown::render(input, output_dir = out, ...)
+    rmarkdown::render(input, output_dir = out,
+                      output_file = "egg_odor_report.docx", ...)
   })
 ---
 
